@@ -57,7 +57,7 @@ exports.getSpotifyToken = onRequest(
 exports.oauthLogin = onRequest(
   (request, response) => {
     const origin = req.headers.origin;
-    const redirect_uri = `${origin}/callback`;
+    const redirectUri = `${origin}/callback`;
     const state = generateRandomString(16);
     const scope = "streaming user-read-email user-read-private";
     const allowedOrigins = [
@@ -67,6 +67,14 @@ exports.oauthLogin = onRequest(
     if(!allowedOrigins.includes(origin)) {
       return res.status(403).json({ error: 'Forbidden origin' });
     };
-    
+    sessionStorage.setItem("state", state);
+    const oauthParams = new URLSearchParams({
+      response_type: "code",
+      client_id: process.env.SPOTIFY_CLIENT_ID,
+      scope: scope,
+      redirect_uri: redirectUri,
+      state: state
+    });
+    res.redirect('https://accounts.spotify.com/authorize/?' + oauthParams.toString());
   },
 );

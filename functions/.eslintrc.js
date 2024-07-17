@@ -28,6 +28,14 @@ module.exports = {
       files: ["./index.js"],
       rules: {
         "max-len": ["off"],
+        "camelcase": ["error", {allow: [
+          "access_token",
+          "refresh_token",
+          "response_type",
+          "client_id",
+          "redirect_uri",
+          "grant_type",
+        ]}],
       },
     },
   ],

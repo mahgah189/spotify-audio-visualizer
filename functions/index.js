@@ -37,33 +37,33 @@ const getSpotifyAccessToken = async (clientId, clientSecret) => {
   }
 };
 
-const createFirebaseUserAccount = async (spotifyId, displayName, email, profilePic) => {
-  const uid = `spotify:${spotifyId}`;
-  try {
-    await admin.auth().getUser(uid);
-    await admin.auth().updateUser(uid, {
-      displayName: displayName,
-      email: email,
-      photoURL: profilePic,
-    });
-  } catch (error) {
-    if (error.code === "auth/user-not-found") {
-      return admin.auth().createUser({
-        uid: uid,
-        displayName: displayName,
-        email: email,
-        profilePic: profilePic,
-      });
-    } else {
-      throw error;
-    }
-  }
-  const firebaseToken = await admin.auth().createCustomToken(uid);
-  logger.log(
-    `Created custom token for ${uid}: ${firebaseToken}`,
-  );
-  return firebaseToken;
-};
+// const createFirebaseUserAccount = async (spotifyId, displayName, email, profilePic) => {
+//   const uid = `spotify:${spotifyId}`;
+//   try {
+//     await admin.auth().getUser(uid);
+//     await admin.auth().updateUser(uid, {
+//       displayName: displayName,
+//       email: email,
+//       photoURL: profilePic,
+//     });
+//   } catch (error) {
+//     if (error.code === "auth/user-not-found") {
+//       return admin.auth().createUser({
+//         uid: uid,
+//         displayName: displayName,
+//         email: email,
+//         photoURL: profilePic,
+//       });
+//     } else {
+//       throw error;
+//     }
+//   }
+//   const firebaseToken = await admin.auth().createCustomToken(uid);
+//   logger.log(
+//     `Created custom token for ${uid}: ${firebaseToken}`,
+//   );
+//   return firebaseToken;
+// };
 
 exports.getSpotifyToken = onRequest(
   {secrets: ["SPOTIFY_CLIENT_SECRET"]},
@@ -98,16 +98,11 @@ exports.login = onRequest(
       // if (!allowedOrigins.includes(origin)) {
       //   return response.status(403).json({error: "Forbidden origin"});
       // }
-      response.cookie("spotify_auth_state", state, {
-        secure: true,
-        httpOnly: true,
-        sameSite: "Strict",
-      });
       const oauthParams = new URLSearchParams({
         response_type: "code",
         client_id: process.env.SPOTIFY_CLIENT_ID,
         scope: scope,
-        redirect_uri: "http://localhost:5173/callback",
+        redirect_uri: "https://callback-hgv7fgobsq-uc.a.run.app",
         state: state,
       });
       response.redirect("https://accounts.spotify.com/authorize/?" + oauthParams.toString());
@@ -117,39 +112,67 @@ exports.login = onRequest(
 
 exports.callback = onRequest(
   {secrets: ["SPOTIFY_CLIENT_SECRET"]},
-  async (request, response) => {
-    const {state, code} = request.query;
-    const storedState = request.cookies.spotify_auth_state;
-    if (!storedState) {
-      return response.status(403).json({error: "No stored state found"});
-    } else if (state !== storedState) {
-      return response.status(403).json*({error: "State parameter doesn't match"});
-    }
-    try {
-      const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
-        method: "POST",
-        headers: {
-          "Authorization": "Basic " + (Buffer.from(process.env.SPOTIFY_CLIENT_ID + ":" + process.env.SPOTIFY_CLIENT_SECRET).toString("base64")),
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({
-          code: code,
-          redirect_uri: "http://localhost:5173/callback",
-          grant_type: "authorization_code:",
-        }).toString(),
-      });
-      const tokenData = await tokenResponse.json();
-      const {access_token, refresh_token} = tokenData;
-      const spotifyResponse = await fetch("https://api.spotify.com/v1/me", {
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-        },
-      });
-      const spotifyUser = await spotifyResponse.json();
-      const firebaseToken = await createFirebaseUserAccount(spotifyUser.id, spotifyUser.display_name, spotifyUser.email, spotifyUser.images[0].url);
-      response.redirect(`http://localhost:5173/access_token=${access_token}&refresh_token=${refresh_token}&firebase_token=${firebaseToken}`);
-    } catch (error) {
-      response.status(500).send("Error getting Spotify access token");
-    }
+  (request, response) => {
+    cors(request, response, async () => {
+      const {state, code} = request.query;
+
+      console.log("Received state:", state);
+      console.log("Authorization code:", code);
+
+      if (!state) {
+        return response.status(403).json({error: "State parameter missing"});
+      }
+      try {
+        const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
+          method: "POST",
+          headers: {
+            "Authorization": "Basic " + (Buffer.from(process.env.SPOTIFY_CLIENT_ID + ":" + process.env.SPOTIFY_CLIENT_SECRET).toString("base64")),
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({
+            code: code,
+            redirect_uri: "https://callback-hgv7fgobsq-uc.a.run.app",
+            grant_type: "authorization_code",
+          }).toString(),
+        });
+
+        console.log("Token response status:", tokenResponse.status);
+        if (!tokenResponse.ok) {
+          console.log("Token response error:", await tokenResponse.text());
+          throw new Error("Failed to fetch token");
+        }
+
+        const tokenData = await tokenResponse.json();
+
+        console.log("Token data:", tokenData);
+
+        const {access_token, refresh_token} = tokenData;
+        const spotifyResponse = await fetch("https://api.spotify.com/v1/me", {
+          headers: {
+            Authorization: `Bearer ${access_token}`,
+          },
+        });
+
+        console.log("Spotify response status:", spotifyResponse.status);
+        if (!spotifyResponse.ok) {
+          console.log("Spotify response error:", await spotifyResponse.text());
+          throw new Error("Failed to fetch Spotify user data");
+        }
+
+        const spotifyUser = await spotifyResponse.json();
+
+        console.log("Spotify user data:", spotifyUser);
+
+        response.cookie("spotify_refresh_token", refresh_token, {
+          httpOnly: true,
+          secure: true,
+          sameSite: "Strict",
+        });
+
+        response.redirect(`http://localhost:5173/?access_token=${access_token}`);
+      } catch (error) {
+        response.status(500).send("Error getting Spotify access token");
+      }
+    });
   },
 );

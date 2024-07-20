@@ -9,6 +9,7 @@ const app = initializeApp({
 });
 const functions = getFunctions(app);
 const login = httpsCallable(functions, "login");
+const callback = httpsCallable(functions, "callback");
 
 const initiateLogin = () => {
   window.location.href = "https://login-hgv7fgobsq-uc.a.run.app";

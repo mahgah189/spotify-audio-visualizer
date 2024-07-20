@@ -7,18 +7,19 @@ import Callback from "/src/pages/Callback/Callback";
 
 function App() {
 
+  const [accessToken, setAccessToken] = React.useState("");
+
   React.useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
+    const url = window.location;
+    const history = window.history;
+    const urlParams = new URLSearchParams(url.search.slice(1));
     if (urlParams.has("access_token")) {
-      const accessToken = urlParams.get("access_token");
-      const refreshToken = urlParams.get("refresh_token");
-      const firebaseToken = urlParams.get("firebase_token");
-
-      localStorage.setItem("spotifyAccessToken", accessToken);
-      localStorage.setItem("spotifyRefreshToken", refreshToken);
-      localStorage.setItem("firebaseToken", firebaseToken);
-
-      handleSignIn();
+      const urlAccessToken = urlParams.get("access_token");
+      const storeToken = token => {
+        setAccessToken(previousToken => token);
+        history.replaceState({}, document.title, "/");
+      };
+      storeToken(urlAccessToken);
     }
   }, []);
 

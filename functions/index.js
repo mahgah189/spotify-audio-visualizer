@@ -8,7 +8,7 @@ const tokenEndpoint = "https://accounts.spotify.com/api/token";
 admin.initializeApp();
 
 const generateRandomString = (length) => {
-  let randomStr;
+  let randomStr = "";
   const possibleChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabsdefghijklmnopqrstuvwxyz1234567890";
   for (let i = 0; i < length; i++) {
     randomStr += possibleChars.charAt(Math.floor(Math.random() * possibleChars.length));
@@ -44,7 +44,7 @@ const createFirebaseUserAccount = async (spotifyId, displayName, email, profileP
     await admin.auth().updateUser(uid, {
       displayName: displayName,
       email: email,
-      profilePic: profilePic,
+      photoURL: profilePic,
     });
   } catch (error) {
     if (error.code === "auth/user-not-found") {
@@ -87,30 +87,31 @@ exports.getSpotifyToken = onRequest(
 
 exports.login = onRequest(
   (request, response) => {
-    const origin = request.headers.origin;
-    const redirectUri = `${origin}/callback`;
-    const state = generateRandomString(16);
-    const scope = "streaming user-read-email user-read-private";
-    const allowedOrigins = [
-      "http://localhost:5173",
-      "spotify-audio-visualizer.web.app",
-    ];
-    if (!allowedOrigins.includes(origin)) {
-      return response.status(403).json({error: "Forbidden origin"});
-    }
-    response.cookie("spotify_auth_state", state, {
-      secure: true,
-      httpOnly: true,
-      sameSite: "Strict",
+    cors(request, response, () => {
+      // const origin = request.headers.origin;
+      const state = generateRandomString(16);
+      const scope = "streaming user-read-email user-read-private";
+      // const allowedOrigins = [
+      //   "http://localhost:5173",
+      //   "spotify-audio-visualizer.web.app",
+      // ];
+      // if (!allowedOrigins.includes(origin)) {
+      //   return response.status(403).json({error: "Forbidden origin"});
+      // }
+      response.cookie("spotify_auth_state", state, {
+        secure: true,
+        httpOnly: true,
+        sameSite: "Strict",
+      });
+      const oauthParams = new URLSearchParams({
+        response_type: "code",
+        client_id: process.env.SPOTIFY_CLIENT_ID,
+        scope: scope,
+        redirect_uri: "http://localhost:5173/callback",
+        state: state,
+      });
+      response.redirect("https://accounts.spotify.com/authorize/?" + oauthParams.toString());
     });
-    const oauthParams = new URLSearchParams({
-      response_type: "code",
-      client_id: process.env.SPOTIFY_CLIENT_ID,
-      scope: scope,
-      redirect_uri: redirectUri,
-      state: state,
-    });
-    response.redirect("https://accounts.spotify.com/authorize/?" + oauthParams.toString());
   },
 );
 
@@ -133,7 +134,7 @@ exports.callback = onRequest(
         },
         body: new URLSearchParams({
           code: code,
-          redirect_uri: `${request.headers.origin}/callback`,
+          redirect_uri: "http://localhost:5173/callback",
           grant_type: "authorization_code:",
         }).toString(),
       });
@@ -146,7 +147,7 @@ exports.callback = onRequest(
       });
       const spotifyUser = await spotifyResponse.json();
       const firebaseToken = await createFirebaseUserAccount(spotifyUser.id, spotifyUser.display_name, spotifyUser.email, spotifyUser.images[0].url);
-      response.json({access_token, refresh_token, firebaseToken});
+      response.redirect(`http://localhost:5173/access_token=${access_token}&refresh_token=${refresh_token}&firebase_token=${firebaseToken}`);
     } catch (error) {
       response.status(500).send("Error getting Spotify access token");
     }

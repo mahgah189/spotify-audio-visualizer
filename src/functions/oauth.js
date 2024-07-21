@@ -1,5 +1,4 @@
 import { initializeApp } from 'firebase/app';
-import 'firebase/auth';
 
 const app = initializeApp({
   projectId: "spotify-audio-visualizer",
@@ -11,9 +10,16 @@ const initiateLogin = () => {
   window.location.href = "https://login-hgv7fgobsq-uc.a.run.app";
 };
 
-const handleLogout = (stateCB) => {
-  localStorage.clear();
-  stateCB(prevToken => "");
+const callRefreshToken = async (uid) => {
+  await fetch("https://refreshtoken-hgv7fgobsq-uc.a.run.app", {
+    method: "POST",
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ uid: uid })
+  })
+    .then(response => response.json())
+    .then(data => console.log(data))
 }
 
-export { initiateLogin, handleLogout };
+export { initiateLogin, callRefreshToken };

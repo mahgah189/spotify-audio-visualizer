@@ -1,11 +1,14 @@
 import React from "react";
 import "./Home.css";
+import { callRefreshToken } from "/src/functions/oauth.js";
 import LoginButton from "/src/components/oauth/LoginButton/LoginButton";
 import LogoutButton from "/src/components/oauth/LogoutButton/LogoutButton";
+import ExpireToken from "/src/components/oauth/ExpireToken/ExpireToken";
 
 function Home() {
   const [isLoggedIn, updateIsLoggedIn] = React.useState(false);
   const [accessToken, setAccessToken] = React.useState("");
+  const [tokenExpired, setTokenExpired] = React.useState(false);
 
   React.useEffect(() => {
     const url = window.location;
@@ -13,7 +16,8 @@ function Home() {
 
     if (urlParams.has("access_token")) {
       const urlAccessToken = urlParams.get("access_token");
-      completeLogin(urlAccessToken);
+      const uid = urlParams.get("uid");
+      completeLogin(urlAccessToken, uid);
     } else if (localStorage.getItem("loggedIn")) {
       updateIsLoggedIn(true);
     } else if (!localStorage.getItem("loggedIn")) {
@@ -27,8 +31,14 @@ function Home() {
     }
   }, [isLoggedIn]);
 
-  const completeLogin = (token) => {
+  React.useEffect(() => {
+    const uid = localStorage.getItem("uid");
+    callRefreshToken(uid);
+  }, [tokenExpired]);
+
+  const completeLogin = (token, uid) => {
     localStorage.setItem("loggedIn", true);
+    localStorage.setItem("uid", uid);
     setAccessToken(prevToken => token);
     updateIsLoggedIn(true);
     window.history.replaceState({}, document.title, "/");
@@ -39,6 +49,10 @@ function Home() {
     setAccessToken(prevToken => "");
     updateIsLoggedIn(false);
   };
+
+  const getToken = () => {
+    setTokenExpired(!tokenExpired);
+  };
   
   return (
     <>
@@ -48,6 +62,9 @@ function Home() {
         /> :
         <LoginButton />
       }
+      <ExpireToken 
+        getToken={getToken}
+      />
     </>
   )
 };

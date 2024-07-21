@@ -6,6 +6,8 @@ const cors = require("cors")({origin: true});
 const tokenEndpoint = "https://accounts.spotify.com/api/token";
 
 admin.initializeApp();
+const db = admin.firestore();
+const users = db.collection("users");
 
 const generateRandomString = (length) => {
   let randomStr = "";
@@ -116,15 +118,50 @@ exports.callback = onRequest(
           },
         });
         const spotifyUser = await spotifyResponse.json();
+        const uid = spotifyUser.id;
+        const name = spotifyUser.display_name;
         console.log("Spotify user data:", spotifyUser);
-        response.cookie("spotify_refresh_token", refresh_token, {
-          httpOnly: true,
-          secure: true,
-          sameSite: "Strict",
+        const userRef = users.doc(uid);
+        userRef.set({
+          token: refresh_token,
+          name: name,
         });
-        response.redirect(`${redirectURL}?access_token=${access_token}`);
+        response.redirect(`${redirectURL}?access_token=${access_token}&uid=${uid}`);
       } catch (error) {
         response.status(500).send("Error getting Spotify access token");
+      }
+    });
+  },
+);
+
+exports.refreshToken = onRequest(
+  {secrets: ["SPOTIFY_CLIENT_SECRET"]},
+  (request, response) => {
+    cors(request, response, async () => {
+      const uid = request.body.uid;
+      const userRef = users.doc(uid);
+      const userDoc = await userRef.get();
+      if (!userDoc.exists) {
+        response.redirect("https://login-hgv7fgobsq-uc.a.run.app");
+      }
+      const token = userDoc.data().token;
+      try {
+        const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
+          method: "POST",
+          headers: {
+            "Authorization": "Basic " + (Buffer.from(process.env.SPOTIFY_CLIENT_ID + ":" + process.env.SPOTIFY_CLIENT_SECRET).toString("base64")),
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams({
+            refresh_token: token,
+            grant_type: "refresh_token",
+          }).toString(),
+        });
+        const data = await tokenResponse.json();
+        return response.json(data.access_token);
+      } catch (error) {
+        console.error("Error refreshing access token:", error);
+        return response.status(500).send("Error refreshing Spotify access token");
       }
     });
   },

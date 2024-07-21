@@ -37,34 +37,6 @@ const getSpotifyAccessToken = async (clientId, clientSecret) => {
   }
 };
 
-// const createFirebaseUserAccount = async (spotifyId, displayName, email, profilePic) => {
-//   const uid = `spotify:${spotifyId}`;
-//   try {
-//     await admin.auth().getUser(uid);
-//     await admin.auth().updateUser(uid, {
-//       displayName: displayName,
-//       email: email,
-//       photoURL: profilePic,
-//     });
-//   } catch (error) {
-//     if (error.code === "auth/user-not-found") {
-//       return admin.auth().createUser({
-//         uid: uid,
-//         displayName: displayName,
-//         email: email,
-//         photoURL: profilePic,
-//       });
-//     } else {
-//       throw error;
-//     }
-//   }
-//   const firebaseToken = await admin.auth().createCustomToken(uid);
-//   logger.log(
-//     `Created custom token for ${uid}: ${firebaseToken}`,
-//   );
-//   return firebaseToken;
-// };
-
 exports.getSpotifyToken = onRequest(
   {secrets: ["SPOTIFY_CLIENT_SECRET"]},
   (request, response) => {
@@ -88,7 +60,6 @@ exports.getSpotifyToken = onRequest(
 exports.login = onRequest(
   (request, response) => {
     cors(request, response, () => {
-      // const origin = request.headers.origin;
       const state = generateRandomString(16);
       const scope = "streaming user-read-email user-read-private";
       // const allowedOrigins = [
@@ -114,13 +85,15 @@ exports.callback = onRequest(
   {secrets: ["SPOTIFY_CLIENT_SECRET"]},
   (request, response) => {
     cors(request, response, async () => {
-      const {state, code} = request.query;
-
-      console.log("Received state:", state);
-      console.log("Authorization code:", code);
-
+      const {state, code, error} = request.query;
+      const redirectURL = "http://localhost:5173/";
+      if (error === "access_denied") {
+        logger.warn("Access denied by user");
+        response.redirect(redirectURL);
+      }
       if (!state) {
-        return response.status(403).json({error: "State parameter missing"});
+        logger.warn("State parameter is missing");
+        response.redirect(redirectURL);
       }
       try {
         const tokenResponse = await fetch("https://accounts.spotify.com/api/token", {
@@ -135,41 +108,21 @@ exports.callback = onRequest(
             grant_type: "authorization_code",
           }).toString(),
         });
-
-        console.log("Token response status:", tokenResponse.status);
-        if (!tokenResponse.ok) {
-          console.log("Token response error:", await tokenResponse.text());
-          throw new Error("Failed to fetch token");
-        }
-
         const tokenData = await tokenResponse.json();
-
-        console.log("Token data:", tokenData);
-
         const {access_token, refresh_token} = tokenData;
         const spotifyResponse = await fetch("https://api.spotify.com/v1/me", {
           headers: {
             Authorization: `Bearer ${access_token}`,
           },
         });
-
-        console.log("Spotify response status:", spotifyResponse.status);
-        if (!spotifyResponse.ok) {
-          console.log("Spotify response error:", await spotifyResponse.text());
-          throw new Error("Failed to fetch Spotify user data");
-        }
-
         const spotifyUser = await spotifyResponse.json();
-
         console.log("Spotify user data:", spotifyUser);
-
         response.cookie("spotify_refresh_token", refresh_token, {
           httpOnly: true,
           secure: true,
           sameSite: "Strict",
         });
-
-        response.redirect(`http://localhost:5173/?access_token=${access_token}`);
+        response.redirect(`${redirectURL}?access_token=${access_token}`);
       } catch (error) {
         response.status(500).send("Error getting Spotify access token");
       }

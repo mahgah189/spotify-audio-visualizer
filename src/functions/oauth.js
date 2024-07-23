@@ -11,15 +11,16 @@ const initiateLogin = () => {
 };
 
 const callRefreshToken = async (uid) => {
-  await fetch("https://refreshtoken-hgv7fgobsq-uc.a.run.app", {
+  const response = await fetch("https://refreshtoken-hgv7fgobsq-uc.a.run.app", {
     method: "POST",
     headers: {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ uid: uid })
-  })
-    .then(response => response.json())
-    .then(data => console.log(data))
-}
+  });
+
+  const data = await response.json();
+  return data;
+};
 
 export { initiateLogin, callRefreshToken };

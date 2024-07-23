@@ -1,14 +1,18 @@
 import React from "react";
 import "./Home.css";
 import { callRefreshToken } from "/src/functions/oauth.js";
+import WebPlayback from "/src/components/player/WebPlayback/WebPlayback";
 import LoginButton from "/src/components/oauth/LoginButton/LoginButton";
 import LogoutButton from "/src/components/oauth/LogoutButton/LogoutButton";
 import ExpireToken from "/src/components/oauth/ExpireToken/ExpireToken";
 
 function Home() {
   const [isLoggedIn, updateIsLoggedIn] = React.useState(false);
-  const [accessToken, setAccessToken] = React.useState("");
-  const [tokenExpired, setTokenExpired] = React.useState(false);
+  const [accessToken, setAccessToken] = React.useState({
+    token: undefined,
+    uid: undefined
+  });
+  const [tokenExpired, setTokenExpired] = React.useState(undefined);
 
   React.useEffect(() => {
     const url = window.location;
@@ -26,20 +30,19 @@ function Home() {
   }, []);
 
   React.useEffect(() => {
-    if (!localStorage.getItem("loggedIn")) {
-      updateIsLoggedIn(false);
+    if (!tokenExpired) {
+      setTimeout(setTokenExpired(true), 1000 * 60 * 59);
     }
-  }, [isLoggedIn]);
+  }, [accessToken]);
 
-  React.useEffect(() => {
-    const uid = localStorage.getItem("uid");
-    callRefreshToken(uid);
-  }, [tokenExpired]);
+  // React.useEffect(() => {
+  //   console.log(accessToken)
+  // }, [accessToken]);
 
   const completeLogin = (token, uid) => {
     localStorage.setItem("loggedIn", true);
-    localStorage.setItem("uid", uid);
-    setAccessToken(prevToken => token);
+    updateTokenExpiredStateToFalse;
+    updateTokenState(token, uid);
     updateIsLoggedIn(true);
     window.history.replaceState({}, document.title, "/");
   };
@@ -50,10 +53,19 @@ function Home() {
     updateIsLoggedIn(false);
   };
 
-  const getToken = () => {
-    setTokenExpired(!tokenExpired);
+  const updateTokenState = (token, uid) => {
+    setAccessToken(prevToken => {
+      return {
+        token: token,
+        uid: uid,
+      };
+    });
+  }
+
+  const updateTokenExpiredStateToFalse = () => {
+    setTokenExpired(false);
   };
-  
+
   return (
     <>
       {isLoggedIn ?
@@ -62,8 +74,12 @@ function Home() {
         /> :
         <LoginButton />
       }
-      <ExpireToken 
-        getToken={getToken}
+      <WebPlayback 
+        accessToken={accessToken}
+        updateTokenState={updateTokenState}
+        tokenExpired={tokenExpired}
+        updateTokenExpiredStateToFalse={updateTokenExpiredStateToFalse}
+        isLoggedIn={isLoggedIn}
       />
     </>
   )

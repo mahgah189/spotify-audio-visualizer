@@ -2,33 +2,48 @@ import React from "react";
 import "./WebPlayback.css";
 import { callRefreshToken } from "/src/functions/oauth.js";
 
-function WebPlayback({ accessToken, tokenExpired, updateTokenState, updateTokenExpiredStateToFalse, isLoggedIn }) {
-  const { token, uid } = accessToken;
-
+function WebPlayback({ isLoggedIn, updateLoginState }) {
   const [player, setPlayer] = React.useState(undefined);
 
+  const userRef = {
+    uid: undefined,
+    token: undefined,
+    expirationTime: undefined,
+    loggedIn: undefined
+  }
+
+  if (localStorage.getItem("userRef")) {
+    const userRef = JSON.parse(localStorage.getItem("userRef"));
+  };
+
   React.useEffect(() => {
-    if (isLoggedIn) {
+    if (localStorage.getItem("userRef")) {
+      updateLoginState(true);
+    } else if (!localStorage.getItem("userRef")) {
+      updateLoginState(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (localStorage.getItem("userRef")) {
       const script = document.createElement("script");
       script.src = "https://sdk.scdn.co/spotify-player.js";
       script.async = true;
   
       document.body.appendChild(script);
   
-      console.log(accessToken);
-  
       window.onSpotifyWebPlaybackSDKReady = () => {
         const player = new window.Spotify.Player({
           name: "Web Playback SDK",
           getOauthToken: async (cb) => {
-              if (tokenExpired === true || tokenExpired === undefined && uid) {
-                const refreshedToken = await callRefreshToken(uid);
+              if (Date.now() > userRef.expirationTime) {
+                const refreshedToken = await callRefreshToken(userRef.uid);
                 console.log(refreshedToken);
-                updateTokenExpiredStateToFalse;
-                updateTokenState(refreshedToken, uid);
+                console.log("token refreshed");
                 cb(refreshedToken);
-              } else if (tokenExpired === false) {
-                cb(token);
+              } else if (Date.now() < userRef.expirationTime) {
+                console.log("token retrieved")
+                cb(userRef.token);
               }
             },
           volume: 0.5

@@ -1,9 +1,25 @@
 import React from "react";
 import "./WebPlayback.css";
 import { callRefreshToken } from "/src/functions/oauth.js";
+import PlaybackControls from "/src/components/player/PlaybackControls/PlaybackControls";
+
+const track = {
+  name: "",
+  album: {
+      images: [
+          { url: "" }
+      ]
+  },
+  artists: [
+      { name: "" }
+  ]
+};
 
 function WebPlayback({ isLoggedIn }) {
   const [player, setPlayer] = React.useState(undefined);
+  const [isPaused, setPaused] = React.useState(false);
+  const [isActive, setActive] = React.useState(false);
+  const [currentTrack, setTrack] = React.useState(track);
 
   const userRef = {
     uid: undefined,
@@ -52,10 +68,10 @@ function WebPlayback({ isLoggedIn }) {
         player.addListener("not_ready", ({ device_id }) => {
           console.log("Device has gone offline:", device_id);
         });
-        player.addListener('player_state_changed', ( state => {
+        player.addListener('player_state_changed', (state => {
           if (!state) {
               return;
-          }
+          };
   
           setTrack(state.track_window.current_track);
           setPaused(state.paused);
@@ -72,6 +88,26 @@ function WebPlayback({ isLoggedIn }) {
 
   return (
     <>
+      <div className="web-playback--container">
+        <div className="web-playback--main-wrapper">
+          <img 
+            className="web-playback--now-playing-image"
+            src={currentTrack.album.images[0].url} 
+            alt="An image of the currently playing track"
+          />
+          <div className="web-playback--current-track">
+            {currentTrack.name}
+          </div>
+          <div className="web-playback--current-artist">
+            {currentTrack.artists[0].name}
+          </div>
+        </div>
+
+        <PlaybackControls 
+          player={player}
+          isPaused={isPaused}
+        />
+      </div>
     </>
   )
 };

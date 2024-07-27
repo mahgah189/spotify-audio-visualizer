@@ -2,33 +2,43 @@ import React from "react";
 import "./WebPlayback.css";
 import { callRefreshToken } from "/src/functions/oauth.js";
 
-function WebPlayback({ accessToken, tokenExpired, updateTokenState, updateTokenExpiredStateToFalse, isLoggedIn }) {
-  const { token, uid } = accessToken;
-
+function WebPlayback({ isLoggedIn }) {
   const [player, setPlayer] = React.useState(undefined);
 
+  const userRef = {
+    uid: undefined,
+    token: undefined,
+    expirationTime: undefined,
+    loggedIn: undefined
+  };
+
+  if (sessionStorage.getItem("userRef")) {
+    const sessionUser = JSON.parse(sessionStorage.getItem("userRef"));
+    userRef.uid = sessionUser.uid;
+    userRef.token = sessionUser.token;
+    userRef.expirationTime = sessionUser.expirationTime;
+    userRef.loggedIn = sessionUser.loggedIn;
+  };
+
   React.useEffect(() => {
-    if (isLoggedIn) {
+    if (userRef.loggedIn) {
       const script = document.createElement("script");
       script.src = "https://sdk.scdn.co/spotify-player.js";
       script.async = true;
   
       document.body.appendChild(script);
   
-      console.log(accessToken);
-  
       window.onSpotifyWebPlaybackSDKReady = () => {
         const player = new window.Spotify.Player({
           name: "Web Playback SDK",
           getOauthToken: async (cb) => {
-              if (tokenExpired === true || tokenExpired === undefined && uid) {
-                const refreshedToken = await callRefreshToken(uid);
-                console.log(refreshedToken);
-                updateTokenExpiredStateToFalse;
-                updateTokenState(refreshedToken, uid);
+              if (Date.now() > userRef.expirationTime) {
+                const refreshedToken = await callRefreshToken(userRef.uid);
+                console.log("token refreshed");
                 cb(refreshedToken);
-              } else if (tokenExpired === false) {
-                cb(token);
+              } else if (Date.now() < userRef.expirationTime) {
+                console.log("token retrieved")
+                cb(userRef.token);
               }
             },
           volume: 0.5

@@ -14,35 +14,26 @@ function Home() {
     if (urlParams.has("access_token")) {
       const urlAccessToken = urlParams.get("access_token");
       const uid = urlParams.get("uid");
-      completeLogin(urlAccessToken, uid);
+      const expirationTime = Date.now() + (1000 * 60 * 59);
+      const userRef = {
+        token: urlAccessToken,
+        uid: uid,
+        expirationTime: expirationTime,
+        loggedIn: true
+      };
+      sessionStorage.setItem("userRef", JSON.stringify(userRef));
+      updateIsLoggedIn(true);
+      window.history.replaceState({}, document.title, "/");
+    } else if (sessionStorage.getItem("userRef")) {
+      updateIsLoggedIn(true);
+    } else if (!sessionStorage.getItem("userRef")) {
+      updateIsLoggedIn(false);
     } 
-    // else if (localStorage.getItem("userRef")) {
-    //   updateIsLoggedIn(true);
-    // } else if (!localStorage.getItem("userRef")) {
-    //   updateIsLoggedIn(false);
-    // } 
   }, []);
 
-  const completeLogin = (token, uid) => {
-    const expirationTime = Date.now() + (1000 * 60 * 59);
-    const userRef = {
-      token: token,
-      uid: uid,
-      expirationTime: expirationTime,
-      loggedIn: true
-    };
-    localStorage.setItem("userRef", JSON.stringify(userRef));
-    updateIsLoggedIn(true);
-    window.history.replaceState({}, document.title, "/");
-  };
-
   const handleLogout = () => {
-    localStorage.clear();
+    sessionStorage.clear();
     updateIsLoggedIn(false);
-  };
-
-  const updateLoginState = (bool) => {
-    updateIsLoggedIn(bool);
   };
 
   return (
@@ -55,7 +46,6 @@ function Home() {
       }
       <WebPlayback 
         isLoggedIn={isLoggedIn}
-        updateLoginState={updateLoginState}
       />
     </>
   )

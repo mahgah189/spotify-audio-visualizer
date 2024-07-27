@@ -2,7 +2,7 @@ import React from "react";
 import "./WebPlayback.css";
 import { callRefreshToken } from "/src/functions/oauth.js";
 
-function WebPlayback({ isLoggedIn, updateLoginState }) {
+function WebPlayback({ isLoggedIn }) {
   const [player, setPlayer] = React.useState(undefined);
 
   const userRef = {
@@ -10,22 +10,18 @@ function WebPlayback({ isLoggedIn, updateLoginState }) {
     token: undefined,
     expirationTime: undefined,
     loggedIn: undefined
-  }
+  };
 
-  if (localStorage.getItem("userRef")) {
-    const userRef = JSON.parse(localStorage.getItem("userRef"));
+  if (sessionStorage.getItem("userRef")) {
+    const sessionUser = JSON.parse(sessionStorage.getItem("userRef"));
+    userRef.uid = sessionUser.uid;
+    userRef.token = sessionUser.token;
+    userRef.expirationTime = sessionUser.expirationTime;
+    userRef.loggedIn = sessionUser.loggedIn;
   };
 
   React.useEffect(() => {
-    if (localStorage.getItem("userRef")) {
-      updateLoginState(true);
-    } else if (!localStorage.getItem("userRef")) {
-      updateLoginState(false);
-    }
-  }, []);
-
-  React.useEffect(() => {
-    if (localStorage.getItem("userRef")) {
+    if (userRef.loggedIn) {
       const script = document.createElement("script");
       script.src = "https://sdk.scdn.co/spotify-player.js";
       script.async = true;
@@ -38,7 +34,6 @@ function WebPlayback({ isLoggedIn, updateLoginState }) {
           getOauthToken: async (cb) => {
               if (Date.now() > userRef.expirationTime) {
                 const refreshedToken = await callRefreshToken(userRef.uid);
-                console.log(refreshedToken);
                 console.log("token refreshed");
                 cb(refreshedToken);
               } else if (Date.now() < userRef.expirationTime) {
